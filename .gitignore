@@ -1,0 +1,7 @@
+.DS_Store
+Thumbs.db
+dist/
+最终交付/
+samples/raw-*
+samples/*-private.*
+*.local.json

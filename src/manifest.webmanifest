@@ -1,0 +1,30 @@
+{
+  "name": "简课表查看",
+  "short_name": "简课表",
+  "description": "纯静态、免登录、离线可用的极简独立课表 PWA，支持自动周次、今日与周视图、单双周调停课与 .ics 导出。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6F7F9",
+  "theme_color": "#2563EB",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
