@@ -95,6 +95,9 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// ── Cloudflare Workers + KV 匿名使用人数统计接口地址（部署 worker/stats-worker.js 后填入） ──
+const STATS_API_BASE = 'https://jiankebao-stats.1145141919810yezi.workers.dev';
+
 // ── 全局应用状态 ──
 const initialLoad = loadScheduleData();
 const upgradedInitial = upgradeLegacyTransferPairs(initialLoad.data);
@@ -488,6 +491,57 @@ function persistPrefs(patch) {
   render();
 }
 
+const statsRuntime = {
+  loading: false,
+  error: ''
+};
+
+async function syncUsageStats({ manual = false } = {}) {
+  const base = STATS_API_BASE.replace(/\/+$/, '');
+  if (!base) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    if (manual) showToast('当前处于断网状态，已展示本地缓存数据');
+    return;
+  }
+  if (statsRuntime.loading) return;
+
+  statsRuntime.loading = true;
+  statsRuntime.error = '';
+  if (manual && state.activeTab === 'settings') render();
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
+
+  try {
+    const isFirstHit = !state.prefs.statsReported;
+    const url = isFirstHit ? `${base}/stats/hit` : `${base}/stats`;
+    const resp = await fetch(url, {
+      method: isFirstHit ? 'POST' : 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+      signal: controller?.signal
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const payload = await resp.json();
+    if (payload && typeof payload.totalUsers === 'number' && Number.isFinite(payload.totalUsers)) {
+      state.prefs = savePrefs({
+        ...state.prefs,
+        statsReported: true,
+        cachedTotalUsers: Math.max(0, Math.floor(payload.totalUsers)),
+        cachedStatsAt: new Date().toISOString()
+      });
+      if (manual) showToast('已刷新使用人数统计');
+    }
+  } catch {
+    statsRuntime.error = '离线或暂不可达';
+    if (manual) showToast('统计服务暂不可达，已保留本地缓存');
+  } finally {
+    if (timer) clearTimeout(timer);
+    statsRuntime.loading = false;
+    if (state.activeTab === 'settings') render();
+  }
+}
+
 function setTab(tab) {
   state.activeTab = tab;
   render();
@@ -495,8 +549,11 @@ function setTab(tab) {
 }
 
 // ── 弹窗控制 ──
-function openModal(title, bodyNodes, footerNodes = []) {
+let modalOnCloseCallback = null;
+
+function openModal(title, bodyNodes, footerNodes = [], options = {}) {
   modalOverlay.replaceChildren();
+  modalOnCloseCallback = typeof options.onClose === 'function' ? options.onClose : null;
   const closeBtn = el('button', {
     type: 'button',
     className: 'btn btn-ghost btn-xs',
@@ -517,8 +574,68 @@ function openModal(title, bodyNodes, footerNodes = []) {
 }
 
 function closeModal() {
+  const onClose = modalOnCloseCallback;
+  modalOnCloseCallback = null;
   modalOverlay.classList.add('hidden');
   modalOverlay.replaceChildren();
+  if (onClose) onClose();
+}
+
+function openWelcomeNameModal({ isFirstUse = false } = {}) {
+  const nameInput = el('input', {
+    type: 'text',
+    value: state.prefs.userName || '',
+    placeholder: '请输入你的名字或昵称',
+    maxLength: 24,
+    'aria-label': '你的名字'
+  });
+
+  const submit = () => {
+    const trimmed = nameInput.value.trim();
+    modalOnCloseCallback = null;
+    closeModal();
+    persistPrefs({ userName: trimmed, namePromptDone: true });
+    showToast(trimmed ? `你好，${trimmed}！` : '已保存称呼设置');
+  };
+
+  const skip = () => {
+    modalOnCloseCallback = null;
+    closeModal();
+    if (isFirstUse) {
+      persistPrefs({ namePromptDone: true });
+    }
+  };
+
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  openModal(
+    isFirstUse ? '欢迎使用简课表' : '设置你的称呼',
+    [
+      el('p', { className: 'muted', style: { margin: 0, fontSize: '13.5px', lineHeight: '1.6' } },
+        '输入你想显示的名字后，将在「今日」界面最上方为你展示专属问候语（也可随时在「设置」中修改或清空）。'),
+      el('div', { className: 'field' },
+        el('label', {}, '你的名字'),
+        nameInput
+      )
+    ],
+    [
+      el('button', { type: 'button', className: 'btn', onClick: skip }, isFirstUse ? '暂不设置' : '取消'),
+      el('button', { type: 'button', className: 'btn btn-primary', onClick: submit }, '确定')
+    ],
+    {
+      onClose: () => {
+        if (isFirstUse && !state.prefs.namePromptDone) {
+          persistPrefs({ namePromptDone: true });
+        }
+      }
+    }
+  );
+  setTimeout(() => nameInput.focus(), 0);
 }
 
 modalOverlay.addEventListener('click', closeModal);
@@ -775,6 +892,13 @@ function renderTodayView() {
   const cancelledForDay = allForDay.filter((o) => o.cancelled);
 
   const root = el('div', { className: 'stack' });
+
+  const greetingName = (state.prefs.userName || '').trim();
+  if (greetingName) {
+    root.appendChild(
+      el('div', { className: 'today-greeting' }, `${greetingName}，你好！祝顺利`)
+    );
+  }
 
   if (state.data.courses.length === 0 && state.data.overrides.length === 0) {
     root.appendChild(renderEmptyOnboardingCard());
@@ -1930,6 +2054,13 @@ function renderSettingsView() {
   const root = el('div', { className: 'stack' });
   const s = state.offlineStatus;
 
+  const privacyNotice = el(
+    'div',
+    { className: 'notice-box notice-success', style: { fontSize: '13.5px', fontWeight: '600', lineHeight: '1.6' } },
+    '本软件不收集用户任何私人信息，可放心使用。如果不放心可以以断网状态打开'
+  );
+  root.appendChild(privacyNotice);
+
   const offlineCard = el(
     'section',
     { className: 'card stack' },
@@ -2046,10 +2177,40 @@ function renderSettingsView() {
 
   const manualLegacyCand = detectLegacyMigrationCandidate({ includeDismissed: true });
 
+  const userNameInput = el('input', {
+    type: 'text',
+    value: state.prefs.userName || '',
+    placeholder: '例如：小明（留空则不显示问候语）',
+    maxLength: 24,
+    'aria-label': '我的称呼'
+  });
+  const saveUserName = () => {
+    const trimmed = userNameInput.value.trim();
+    persistPrefs({ userName: trimmed, namePromptDone: true });
+    showToast(trimmed ? `已保存称呼：${trimmed}` : '已清空称呼');
+  };
+  userNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveUserName();
+    }
+  });
+
   const prefCard = el(
     'section',
     { className: 'card stack' },
     el('h3', { className: 'section-title' }, '显示偏好与数据管理'),
+    el('div', { className: 'field' },
+      el('label', {}, '我的称呼（显示在「今日」界面最上方）'),
+      el('div', { className: 'row' },
+        userNameInput,
+        el('button', {
+          type: 'button',
+          className: 'btn btn-primary btn-sm',
+          onClick: saveUserName
+        }, '保存称呼')
+      )
+    ),
     el('div', { className: 'field' }, el('label', {}, '主题外观'), themeSelect),
     el('div', { className: 'field' }, el('label', {}, '默认首页'), defaultTabSelect),
     el('div', { className: 'field' }, el('label', {}, '周课表周末列'), weekendSelect),
@@ -2256,6 +2417,105 @@ function renderSettingsView() {
     )
   );
   root.appendChild(periodsCard);
+
+  const extraGrid = el('div', { className: 'two-col' });
+
+  // 意见栏
+  const feedbackEmail = '326745834@qq.com';
+  const feedbackTextarea = el('textarea', {
+    rows: 3,
+    placeholder: '欢迎写下你的使用建议、问题反馈或功能许愿…',
+    'aria-label': '意见反馈内容'
+  });
+
+  const feedbackCard = el(
+    'section',
+    { className: 'card stack' },
+    el('h3', { className: 'section-title' }, '意见栏'),
+    el('p', { className: 'muted', style: { margin: 0, fontSize: '13px', lineHeight: '1.6' } },
+      '如果你在使用过程中遇到问题或有任何建议，欢迎通过邮件联系作者：'),
+    el('div', { className: 'notice-box notice-info row-between', style: { padding: '8px 12px', fontSize: '13px' } },
+      el('strong', { className: 'tabular' }, feedbackEmail),
+      el('button', {
+        type: 'button',
+        className: 'btn btn-xs btn-soft',
+        onClick: () => copyTextToClipboard(feedbackEmail, `已复制邮箱：${feedbackEmail}`)
+      }, '复制邮箱')
+    ),
+    el('div', { className: 'field' },
+      el('label', {}, '意见或建议内容'),
+      feedbackTextarea
+    ),
+    el('div', { className: 'row' },
+      el('button', {
+        type: 'button',
+        className: 'btn btn-primary btn-sm',
+        onClick: () => {
+          const content = feedbackTextarea.value.trim();
+          const subject = encodeURIComponent('简课表查看 - 意见反馈');
+          const body = encodeURIComponent(content || '你好，我想反馈以下意见或建议：\n\n');
+          window.location.href = `mailto:${feedbackEmail}?subject=${subject}&body=${body}`;
+        }
+      }, '发送邮件反馈'),
+      el('button', {
+        type: 'button',
+        className: 'btn btn-sm',
+        onClick: () => {
+          const content = feedbackTextarea.value.trim();
+          if (!content) {
+            copyTextToClipboard(feedbackEmail, `已复制邮箱：${feedbackEmail}`);
+            return;
+          }
+          copyTextToClipboard(`收件邮箱：${feedbackEmail}\n反馈内容：\n${content}`, '已复制邮箱与反馈内容');
+        }
+      }, '复制反馈内容')
+    )
+  );
+  extraGrid.appendChild(feedbackCard);
+
+  // 致谢与使用人数统计（Cloudflare Workers + KV 方案）
+  const hasStatsApi = Boolean(STATS_API_BASE.trim());
+  const cachedCount = state.prefs.cachedTotalUsers;
+  let statsMainText = '';
+  if (typeof cachedCount === 'number') {
+    statsMainText = `累计使用人数：${cachedCount} 人`;
+  } else if (!hasStatsApi) {
+    statsMainText = '待部署 Cloudflare Worker（已在仓库 worker/ 目录预置服务端代码，部署并填入 STATS_API_BASE 后自动启用）';
+  } else if (statsRuntime.loading) {
+    statsMainText = '正在同步使用人数…';
+  } else {
+    statsMainText = '暂未获取到统计数据（联网后自动更新，断网时展示本地缓存）';
+  }
+
+  const aboutCard = el(
+    'section',
+    { className: 'card stack' },
+    el('h3', { className: 'section-title' }, '致谢与使用人数统计'),
+    el('div', { className: 'stack', style: { gap: '8px', fontSize: '13px', lineHeight: '1.6' } },
+      el('div', { className: 'notice-box', style: { padding: '10px 12px' } },
+        el('strong', { style: { display: 'block', marginBottom: '4px' } }, '致谢'),
+        el('span', { className: 'muted' }, '内容待定（感谢每一位使用与支持「简课表查看」的朋友，后续将在此完善致谢内容）。')
+      ),
+      el('div', { className: 'notice-box stack', style: { padding: '10px 12px', gap: '6px' } },
+        el('div', { className: 'row-between' },
+          el('strong', {}, '使用人数统计'),
+          hasStatsApi
+            ? el('button', {
+              type: 'button',
+              className: 'btn btn-xs btn-soft',
+              disabled: statsRuntime.loading,
+              onClick: () => syncUsageStats({ manual: true })
+            }, statsRuntime.loading ? '同步中…' : '刷新统计')
+            : el('span', { className: 'tag tag-muted' }, 'Cloudflare Workers + KV')
+        ),
+        el('div', { className: typeof cachedCount === 'number' ? 'tabular' : 'muted', style: typeof cachedCount === 'number' ? { fontSize: '16px', fontWeight: '700' } : {} }, statsMainText),
+        el('div', { className: 'muted', style: { fontSize: '12px' } },
+          '隐私保护：仅在首次联网时进行一次匿名 +1 计数，不上传姓名、课表或任何设备信息；断网模式下不发任何网络请求。')
+      )
+    )
+  );
+  extraGrid.appendChild(aboutCard);
+  root.appendChild(extraGrid);
 
   return root;
 }
@@ -2993,4 +3253,10 @@ applyTheme();
 window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
 render();
 initServiceWorker();
-checkIncomingHashSchedule();
+syncUsageStats();
+(async () => {
+  await checkIncomingHashSchedule();
+  if (!state.prefs.namePromptDone && modalOverlay.classList.contains('hidden')) {
+    openWelcomeNameModal({ isFirstUse: true });
+  }
+})();

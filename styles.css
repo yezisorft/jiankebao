@@ -428,6 +428,22 @@ textarea { min-height: 108px; resize: vertical; line-height: 1.45; }
 .tag-muted { background: var(--surface-subtle); color: var(--text-muted); }
 
 /* 今日视图 */
+.today-greeting {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--primary-soft), color-mix(in srgb, var(--primary) 6%, var(--surface)));
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+  border-left: 4px solid var(--primary);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  box-shadow: var(--shadow-sm);
+}
+
 .today-header {
   display: flex;
   flex-direction: column;

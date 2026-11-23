@@ -47,7 +47,12 @@ export const DEFAULT_PREFS = {
   showWeekend: 'auto',    // auto | always | never
   defaultTab: 'today',    // today | week
   icsAlarmMinutes: 15,
-  iosHintDismissed: false
+  iosHintDismissed: false,
+  userName: '',
+  namePromptDone: false,
+  statsReported: false,
+  cachedTotalUsers: null,
+  cachedStatsAt: ''
 };
 
 const fallbackMutexQueues = new Map();
