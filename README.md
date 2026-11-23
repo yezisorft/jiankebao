@@ -1,48 +1,52 @@
-# 简课表查看
+# 简课表查看（JianKeBiao PWA）
 
-一个纯静态、免登录、离线优先的独立课表 PWA 工具，支持在手机（iPhone / Android 添加到主屏幕）和电脑浏览器中直接运行。
+一个**纯静态、零依赖、免登录、离线优先**的个人课表 PWA 工具，支持电脑浏览器和 **iPhone / Android 添加到主屏幕**独立全屏运行（断网秒开）。
 
-## 首版（V1）交付范围
+- **在线地址（GitHub Pages）**：https://yezisorft.github.io/jiankebao/
+- **当前版本**：`v1.0.5-73ad0cd2`（17 项核心资源原子离线缓存）
+- **仓库分支说明**：
+  - `main` 分支：线上静态发布站点（直接托管 GitHub Pages）
+  - `source` 分支：完整源码、36 项自动化测试、构建脚本与文档（[查看源码分支](https://github.com/yezisorft/jiankebao/tree/source)）
+- **详细使用报告与每步 AI 提示词**：[docs/项目总结与使用报告.md](https://github.com/yezisorft/jiankebao/blob/source/docs/%E9%A1%B9%E7%9B%AE%E6%80%BB%E7%BB%93%E4%B8%8E%E4%BD%BF%E7%94%A8%E6%8A%A5%E5%91%8A.md)
 
-首版优先跑通核心闭环：**「导入 → 核对 → 手机独立窗口断网打开」**。
+---
 
-- **今日视图 & 周视图**：共用同一套「实际课次」计算引擎，支持自动周次、当前课程/下节倒计时、学期结束状态与可选下学期倒计时。
-- **课程编辑（仅此一次 / 整组课程）**：完整支持单双周、非连续周、临时停课、调课补课、临时换教室；同一门课按课程 ID 固定颜色。
-- **可调作息模板**：默认提供浙江经贸职业技术学院作息（13 节/天，每节 40 分钟），支持自由增减节次及修改每节起止时间。
-- **统一导入与恢复管线**（`解析 → 校验 → 预览 → 快照备份 → 确认保存`）：
-  - 手动录入与编辑
-  - 1 个基于脱敏真实样本验证过的教务已渲染表格解析器 + 通用表格兜底
-  - 完整 JSON 备份与恢复（包含课程、例外、作息、学期设置）
-  - 「发送课表 / 导入副本」：支持 JSON 文件、复制导入码、版本化压缩 `#schedule=...` 链接
-- **`.ics` 日历导出**：按学期将实际课次展开为独立 `VEVENT`（稳定 UID + 时区 + 可选 `VALARM` 提醒），单双周与调停课精准一致。
-- **HTTPS 离线安装**：版本化原子缓存 Service Worker，主屏幕 App 首次联网缓存完成后显示「已可离线使用」。
+## 核心功能
 
-## 后续迭代（V2）
+- **今日视图 & 周课表视图**：共用同一套实际课次引擎，自动计算当前周次、上课中/下节倒计时，支持单双周、非连续周、周末列切换与快捷键/手势翻周，完整保留全部教师真实姓名。
+- **内置真实作息模板**：含 **早自习（08:00–08:15，不占正课编号）** 与 **13 节作息（08:15–20:40，每节 40 分钟）**，支持自由增减节次与防删课缩短保护。
+- **灵活编辑（仅此一次 / 整组课程）**：支持单次停课、临时改教室/时间、跨天调课（支持成对一键撤回）、单次补课及整组周期规则编辑。
+- **统一安全导入管线**（`解析 → 校验 → 纯文本预览 → 自动保留覆盖前快照 → 确认保存`）：
+  - 正方新版教务 `jwglxt V-9.0` 已渲染表格解析 + 通用表格兜底（纯文本隔离解析，不执行脚本、不加载外部资源）
+  - 完整紧凑 JSON 备份与恢复（支持 4 MB UTF-8 预算，保留全部独立规则与调停课例外）
+  - 跨设备同步：**导入码（`JKB1:` 压缩）** 与 `#schedule=...` 快捷链接
+- **`.ics` 系统日历导出**：与今日/周课表共用同一课次引擎，按整学期展开为稳定 UID 独立事件，支持可选课前提醒与非上海 IANA 时区 RFC 5545 UTC 转换。
+- **数据安全与离线体验**：Web Locks 跨标签页防覆盖、硬配额校验、损坏存储原文导出保护、内容哈希 Service Worker 离线更新提示与全出血 iOS 主屏幕图标。
 
-- 更多高校教务系统真样本适配
-- CSV 导入与 `.ics` 日历导入（支持单次事件与常见每周重复规则，异常项在预览中标注）
-- 书签 / 控制台提取脚本（作为高级辅助入口）
+---
 
-## 目录结构
+## 快速上手（iPhone 主屏幕安装）
 
-```text
-简课表查看/
-├── README.md                       # 项目说明与范围
-├── docs/
-│   ├── feasibility-and-design.md   # 可行性分析、数据模型与架构设计
-│   └── acceptance-checklist.md     # 上线前三大验收走查清单与 HTTPS 测试说明
-├── samples/
-│   └── README.md                   # 真实教务样本采集与脱敏指南
-├── src/                            # 纯静态 PWA 源码（零构建依赖）
-│   ├── js/
-│   └── icons/
-└── tests/                          # 基于 Node 内置 test runner 的核心逻辑单元测试
+1. **电脑端导入**：打开 https://yezisorft.github.io/jiankebao/ → 进入 **「导入」** 粘贴教务表格 HTML（或点「载入演示样例」）→ 核对预览并保存 → 在 **「设置」** 核对开学第 1 周周一日期与作息 → 点 **「复制导入码」** 发到微信。
+2. **装到 iPhone 桌面**：用 iPhone **Safari** 打开 https://yezisorft.github.io/jiankebao/ → 点底部 **分享（□↑）→ 添加到主屏幕 → 添加**。
+3. **离线缓存并导入**：从桌面打开 **「简课表」** 图标，联网等 2~3 秒看到顶部绿色 **「已可离线使用」** → 点底部 **「导入」** 粘贴导入码保存 → 开飞行模式验证断网秒开。
+
+更多部署细节、逐条复现步骤与 AI 辅助提示词请见：
+- [项目总结与使用报告（含每步 AI 提示词）](https://github.com/yezisorft/jiankebao/blob/source/docs/%E9%A1%B9%E7%9B%AE%E6%80%BB%E7%BB%93%E4%B8%8E%E4%BD%BF%E7%94%A8%E6%8A%A5%E5%91%8A.md)
+- [iPhone 安装与部署指南](https://github.com/yezisorft/jiankebao/blob/source/docs/iphone-deploy-guide.md)
+- [上线验收清单](https://github.com/yezisorft/jiankebao/blob/source/docs/acceptance-checklist.md)
+
+---
+
+## 本地开发与验证（`source` 分支）
+
+```bash
+# 运行全部 36 项自动化单元与回归测试
+node --test tests/*.test.mjs
+
+# 按内容哈希重新构建 dist/site 与 dist/jiankebiao-pwa.zip
+bash scripts/package-release.sh
+
+# 本地静态预览（支持 Service Worker）
+python3 -m http.server 8080 --bind 127.0.0.1 --directory dist/site
 ```
-
-## 本地预览说明
-
-- **电脑端调试（含 Service Worker）**：`http://localhost:8080` 属于安全上下文，可直接执行：
-  ```bash
-  python3 -m http.server 8080 --directory src
-  ```
-- **手机端离线验收**：局域网 `http://192.168.x.x` 仅可预览界面布局，无法注册 Service Worker。离线与主屏幕安装验收须部署或代理到手机信任的 **HTTPS** 地址（详见 [docs/acceptance-checklist.md](docs/acceptance-checklist.md)）。
