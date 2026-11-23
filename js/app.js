@@ -95,8 +95,8 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-// ── Cloudflare Workers + KV 匿名使用人数统计接口地址（部署 worker/stats-worker.js 后填入） ──
-const STATS_API_BASE = 'https://jiankebao-stats.1145141919810yezi.workers.dev';
+// ── 不蒜子（Busuanzi）国内直连匿名访问人数统计接口 ──
+const BUSUANZI_JSONP_URL = 'https://busuanzi.ibruce.info/busuanzi';
 
 // ── 全局应用状态 ──
 const initialLoad = loadScheduleData();
@@ -496,9 +496,46 @@ const statsRuntime = {
   error: ''
 };
 
+function fetchBusuanziStats(timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const cbName = `BusuanziCallback_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      try { delete window[cbName]; } catch { window[cbName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('timeout'));
+    }, timeoutMs);
+
+    window[cbName] = (data) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(data);
+    };
+
+    script.async = true;
+    script.referrerPolicy = 'no-referrer-when-downgrade';
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('network_error'));
+    };
+    script.src = `${BUSUANZI_JSONP_URL}?jsonpCallback=${encodeURIComponent(cbName)}`;
+    document.head.appendChild(script);
+  });
+}
+
 async function syncUsageStats({ manual = false } = {}) {
-  const base = STATS_API_BASE.replace(/\/+$/, '');
-  if (!base) return;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     if (manual) showToast('当前处于断网状态，已展示本地缓存数据');
     return;
@@ -509,34 +546,24 @@ async function syncUsageStats({ manual = false } = {}) {
   statsRuntime.error = '';
   if (manual && state.activeTab === 'settings') render();
 
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
-
   try {
-    const isFirstHit = !state.prefs.statsReported;
-    const url = isFirstHit ? `${base}/stats/hit` : `${base}/stats`;
-    const resp = await fetch(url, {
-      method: isFirstHit ? 'POST' : 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-      signal: controller?.signal
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const payload = await resp.json();
-    if (payload && typeof payload.totalUsers === 'number' && Number.isFinite(payload.totalUsers)) {
+    const payload = await fetchBusuanziStats(10000);
+    const uv = Number(payload?.site_uv);
+    if (Number.isFinite(uv) && uv >= 0) {
       state.prefs = savePrefs({
         ...state.prefs,
         statsReported: true,
-        cachedTotalUsers: Math.max(0, Math.floor(payload.totalUsers)),
+        cachedTotalUsers: Math.floor(uv),
         cachedStatsAt: new Date().toISOString()
       });
       if (manual) showToast('已刷新使用人数统计');
+    } else {
+      throw new Error('invalid_payload');
     }
   } catch {
     statsRuntime.error = '离线或暂不可达';
     if (manual) showToast('统计服务暂不可达，已保留本地缓存');
   } finally {
-    if (timer) clearTimeout(timer);
     statsRuntime.loading = false;
     if (state.activeTab === 'settings') render();
   }
@@ -2473,14 +2500,11 @@ function renderSettingsView() {
   );
   extraGrid.appendChild(feedbackCard);
 
-  // 致谢与使用人数统计（Cloudflare Workers + KV 方案）
-  const hasStatsApi = Boolean(STATS_API_BASE.trim());
+  // 致谢与使用人数统计（不蒜子国内直连匿名统计）
   const cachedCount = state.prefs.cachedTotalUsers;
   let statsMainText = '';
   if (typeof cachedCount === 'number') {
     statsMainText = `累计使用人数：${cachedCount} 人`;
-  } else if (!hasStatsApi) {
-    statsMainText = '待部署 Cloudflare Worker（已在仓库 worker/ 目录预置服务端代码，部署并填入 STATS_API_BASE 后自动启用）';
   } else if (statsRuntime.loading) {
     statsMainText = '正在同步使用人数…';
   } else {
@@ -2499,18 +2523,16 @@ function renderSettingsView() {
       el('div', { className: 'notice-box stack', style: { padding: '10px 12px', gap: '6px' } },
         el('div', { className: 'row-between' },
           el('strong', {}, '使用人数统计'),
-          hasStatsApi
-            ? el('button', {
-              type: 'button',
-              className: 'btn btn-xs btn-soft',
-              disabled: statsRuntime.loading,
-              onClick: () => syncUsageStats({ manual: true })
-            }, statsRuntime.loading ? '同步中…' : '刷新统计')
-            : el('span', { className: 'tag tag-muted' }, 'Cloudflare Workers + KV')
+          el('button', {
+            type: 'button',
+            className: 'btn btn-xs btn-soft',
+            disabled: statsRuntime.loading,
+            onClick: () => syncUsageStats({ manual: true })
+          }, statsRuntime.loading ? '同步中…' : '刷新统计')
         ),
         el('div', { className: typeof cachedCount === 'number' ? 'tabular' : 'muted', style: typeof cachedCount === 'number' ? { fontSize: '16px', fontWeight: '700' } : {} }, statsMainText),
         el('div', { className: 'muted', style: { fontSize: '12px' } },
-          '隐私保护：仅在首次联网时进行一次匿名 +1 计数，不上传姓名、课表或任何设备信息；断网模式下不发任何网络请求。')
+          '隐私保护：仅匿名统计累计访客数，不上传姓名、课表或任何私人信息；断网模式下不发任何网络请求。')
       )
     )
   );

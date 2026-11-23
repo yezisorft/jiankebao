@@ -9,7 +9,7 @@
  */
 
 // @build-meta-start
-const CACHE_VERSION = 'v1.0.8-live-stats';
+const CACHE_VERSION = 'v1.0.9-busuanzi-stats';
 const CORE_ASSETS = [
   './',
   './icons/apple-touch-icon.png',
