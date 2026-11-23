@@ -2132,11 +2132,11 @@ function renderSettingsView() {
     { className: 'card stack' },
     el('h3', { className: 'section-title' }, '学期与周次设置'),
     el('div', { className: 'field' }, el('label', {}, '学期名称'), termNameInput),
-    el('div', { className: 'row' },
+    el('div', { className: 'form-grid form-grid-date-weeks' },
       el('div', { className: 'field' }, el('label', {}, '第 1 周周一日期（自动对齐至周一）'), startMonInput),
-      el('div', { className: 'field', style: { maxWidth: '120px' } }, el('label', {}, '总周数'), totalWeeksInput)
+      el('div', { className: 'field' }, el('label', {}, '总周数'), totalWeeksInput)
     ),
-    el('div', { className: 'row' },
+    el('div', { className: 'form-grid' },
       el('div', { className: 'field' }, el('label', {}, '学校时区（合法 IANA 标识，如 Asia/Shanghai）'), tzInput),
       el('div', { className: 'field' }, el('label', {}, '下学期开学日（可选，本学期结束后显示倒计时）'), nextTermInput)
     ),

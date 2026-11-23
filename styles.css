@@ -372,9 +372,30 @@ button, .occ-card, .grid-block {
   color: var(--text);
 }
 
-/* 表单元素（16px 避免 iOS Safari 自动放大） */
+/* 表单元素（16px 避免 iOS Safari 自动放大，统一单行输入框高度与宽度） */
 .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 130px; }
-.field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); line-height: 1.4; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.form-grid .field {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+  .form-grid.form-grid-date-weeks {
+    grid-template-columns: minmax(0, 1fr) 128px;
+  }
+}
 
 input[type="text"],
 input[type="date"],
@@ -383,6 +404,8 @@ input[type="number"],
 select,
 textarea {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-family: inherit;
   font-size: 16px;
   color: var(--text);
@@ -394,6 +417,23 @@ textarea {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+input[type="text"],
+input[type="date"],
+input[type="time"],
+input[type="number"],
+select {
+  height: 42px;
+  min-height: 42px;
+  line-height: 1.3;
+}
+
+input[type="date"],
+input[type="time"] {
+  display: block;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 @media (min-width: 768px) {
   input[type="text"],
   input[type="date"],
@@ -401,6 +441,14 @@ textarea {
   input[type="number"],
   select,
   textarea { font-size: 14px; }
+  input[type="text"],
+  input[type="date"],
+  input[type="time"],
+  input[type="number"],
+  select {
+    height: 38px;
+    min-height: 38px;
+  }
 }
 
 input:focus, select:focus, textarea:focus {
