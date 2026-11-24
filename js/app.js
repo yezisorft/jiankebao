@@ -95,9 +95,9 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-// ── 不蒜子（Busuanzi）主线路 + Vercount 备用线路（兼容华为/鸿蒙浏览器防跟踪拦截） ──
-const BUSUANZI_JSONP_URL = 'https://busuanzi.ibruce.info/busuanzi';
+// ── Vercount 全端统一匿名访问人数统计接口（兼容 iPhone / 安卓 / 鸿蒙浏览器） ──
 const VERCOUNT_API_URL = 'https://events.vercount.one/api/v2/log';
+const STATS_BASE_OFFSET = 24; // 保留此前不蒜子阶段累计的历史访客基数
 
 // ── 全局应用状态 ──
 const initialLoad = loadScheduleData();
@@ -497,45 +497,6 @@ const statsRuntime = {
   error: ''
 };
 
-function fetchBusuanziStats(timeoutMs = 10000) {
-  return new Promise((resolve, reject) => {
-    const cbName = `BusuanziCallback_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
-    const script = document.createElement('script');
-    let settled = false;
-
-    const cleanup = () => {
-      if (timer) clearTimeout(timer);
-      try { delete window[cbName]; } catch { window[cbName] = undefined; }
-      if (script.parentNode) script.parentNode.removeChild(script);
-    };
-
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new Error('timeout'));
-    }, timeoutMs);
-
-    window[cbName] = (data) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(data);
-    };
-
-    script.async = true;
-    script.referrerPolicy = 'no-referrer-when-downgrade';
-    script.onerror = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new Error('network_error'));
-    };
-    script.src = `${BUSUANZI_JSONP_URL}?jsonpCallback=${encodeURIComponent(cbName)}`;
-    document.head.appendChild(script);
-  });
-}
-
 async function fetchVercountStats(timeoutMs = 8000) {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
@@ -555,7 +516,7 @@ async function fetchVercountStats(timeoutMs = 8000) {
     const json = await resp.json();
     const uv = Number(json?.data?.site_uv);
     if (!Number.isFinite(uv) || uv < 0) throw new Error('invalid_vercount_payload');
-    return { site_uv: Math.max(1, Math.floor(uv)) };
+    return { site_uv: STATS_BASE_OFFSET + Math.max(0, Math.floor(uv)) };
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -573,12 +534,7 @@ async function syncUsageStats({ manual = false } = {}) {
   if (manual && state.activeTab === 'settings') render();
 
   try {
-    let payload = null;
-    try {
-      payload = await fetchBusuanziStats(6000);
-    } catch {
-      payload = await fetchVercountStats(8000);
-    }
+    const payload = await fetchVercountStats(8000);
     const uv = Number(payload?.site_uv);
     if (Number.isFinite(uv) && uv >= 0) {
       state.prefs = savePrefs({
