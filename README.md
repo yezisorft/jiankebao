@@ -3,7 +3,7 @@
 一个**纯静态、零依赖、免登录、离线优先**的个人课表 PWA 工具，支持电脑浏览器和 **iPhone / Android 添加到主屏幕**独立全屏运行（断网秒开）。
 
 - **在线地址（GitHub Pages）**：https://yezisorft.github.io/jiankebao/
-- **当前版本**：`v1.0.11-period-times-credits`（17 项核心资源原子离线缓存）
+- **当前版本**：`v1.0.12-stats-fallback`（17 项核心资源原子离线缓存）
 - **仓库分支说明**：
   - `main` 分支：线上静态发布站点（直接托管 GitHub Pages）
   - `source` 分支：完整源码、36 项自动化测试、构建脚本与文档（[查看源码分支](https://github.com/yezisorft/jiankebao/tree/source)）
@@ -30,7 +30,10 @@
 
 ## 版本更新记录
 
-### `v1.0.11-period-times-credits`（当前版本）
+### `v1.0.12-stats-fallback`（当前版本）
+- **使用人数统计双线路自动容错**：保留不蒜子为主线路，新增 Vercount（`events.vercount.one`）标准 `fetch` 备用线路，解决华为/鸿蒙浏览器防跟踪过滤或部分网络拦截 JSONP 统计脚本导致「统计服务暂不可达」的问题。
+
+### `v1.0.11-period-times-credits`
 - **完整展示每节起止时间**：周课表左侧节次轴每节课均完整展示「节次 + 开始时间 + 结束时间」，方便一眼核对上下课时间。
 - **早自习按第 1 节有课动态显示**：仅在当天第 1 节有排课时显示「早自习 08:00 – 08:15」（周课表顶部同步列出本周第 1 节有课的星期）。
 - **致谢名单更新**：在「设置 → 致谢与使用人数统计」中正式致谢 Antigravity、GPT 与 DeepSeek。

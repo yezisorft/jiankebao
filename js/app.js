@@ -95,8 +95,9 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-// ── 不蒜子（Busuanzi）国内直连匿名访问人数统计接口 ──
+// ── 不蒜子（Busuanzi）主线路 + Vercount 备用线路（兼容华为/鸿蒙浏览器防跟踪拦截） ──
 const BUSUANZI_JSONP_URL = 'https://busuanzi.ibruce.info/busuanzi';
+const VERCOUNT_API_URL = 'https://events.vercount.one/api/v2/log';
 
 // ── 全局应用状态 ──
 const initialLoad = loadScheduleData();
@@ -535,6 +536,31 @@ function fetchBusuanziStats(timeoutMs = 10000) {
   });
 }
 
+async function fetchVercountStats(timeoutMs = 8000) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const pageUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}${window.location.pathname}`
+      : 'https://yezisorft.github.io/jiankebao/';
+    const resp = await fetch(VERCOUNT_API_URL, {
+      method: 'POST',
+      mode: 'cors',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: pageUrl, token: '' }),
+      signal: controller?.signal
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    const uv = Number(json?.data?.site_uv);
+    if (!Number.isFinite(uv) || uv < 0) throw new Error('invalid_vercount_payload');
+    return { site_uv: Math.max(1, Math.floor(uv)) };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function syncUsageStats({ manual = false } = {}) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     if (manual) showToast('当前处于断网状态，已展示本地缓存数据');
@@ -547,7 +573,12 @@ async function syncUsageStats({ manual = false } = {}) {
   if (manual && state.activeTab === 'settings') render();
 
   try {
-    const payload = await fetchBusuanziStats(10000);
+    let payload = null;
+    try {
+      payload = await fetchBusuanziStats(6000);
+    } catch {
+      payload = await fetchVercountStats(8000);
+    }
     const uv = Number(payload?.site_uv);
     if (Number.isFinite(uv) && uv >= 0) {
       state.prefs = savePrefs({

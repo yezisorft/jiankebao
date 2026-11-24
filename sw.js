@@ -9,7 +9,7 @@
  */
 
 // @build-meta-start
-const CACHE_VERSION = 'v1.0.11-period-times-credits';
+const CACHE_VERSION = 'v1.0.12-stats-fallback';
 const CORE_ASSETS = [
   './',
   './icons/apple-touch-icon.png',
