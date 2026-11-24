@@ -724,7 +724,7 @@ textarea { min-height: 108px; resize: vertical; line-height: 1.45; }
 
 .week-header {
   display: grid;
-  grid-template-columns: 44px repeat(var(--day-cols, 5), minmax(0, 1fr));
+  grid-template-columns: 48px repeat(var(--day-cols, 5), minmax(0, 1fr));
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle);
 }
@@ -752,7 +752,7 @@ textarea { min-height: 108px; resize: vertical; line-height: 1.45; }
 
 .week-body {
   display: grid;
-  grid-template-columns: 44px repeat(var(--day-cols, 5), minmax(0, 1fr));
+  grid-template-columns: 48px repeat(var(--day-cols, 5), minmax(0, 1fr));
   position: relative;
 }
 
@@ -773,8 +773,9 @@ textarea { min-height: 108px; resize: vertical; line-height: 1.45; }
   padding: 2px;
 }
 
-.period-tick-num { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.1; }
-.period-tick-time { font-size: 10px; color: var(--text-muted); line-height: 1.2; }
+.period-tick-num { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.15; margin-bottom: 1px; }
+.period-tick-time { font-size: 9.5px; color: var(--text-muted); line-height: 1.18; white-space: nowrap; }
+.period-tick-end { opacity: 0.78; }
 
 .day-column {
   position: relative;

@@ -1034,15 +1034,15 @@ function renderTodayView() {
   );
   root.appendChild(switcher);
 
-  const viewingDow = getDayOfWeekISO(viewingStr);
-  if (state.data.periods[0]?.start === '08:15' && viewingDow >= 1 && viewingDow <= 5) {
+  const hasFirstPeriodClass = activeForDay.some((o) => o.startPeriod <= 1 && o.endPeriod >= 1);
+  if (hasFirstPeriodClass) {
     root.appendChild(
       el('div', {
         className: 'notice-box notice-info row-between tabular',
         style: { padding: '8px 12px', fontSize: '12.5px' }
       },
         el('strong', {}, '早自习'),
-        el('span', { className: 'muted' }, '08:00 – 08:15（第 1 节前）')
+        el('span', { className: 'muted' }, '08:00 – 08:15（第 1 节有课）')
       )
     );
   }
@@ -1334,14 +1334,18 @@ function renderWeekView() {
     return root;
   }
 
-  if (periods[0]?.start === '08:15') {
+  const firstPeriodDays = visibleDays.filter((day) =>
+    day.occurrences.some((o) => !o.cancelled && o.startPeriod <= 1 && o.endPeriod >= 1)
+  );
+  if (firstPeriodDays.length > 0) {
+    const dayLabels = firstPeriodDays.map((d) => DAY_NAMES[d.dayOfWeek]).join('、');
     root.appendChild(
       el('div', {
         className: 'notice-box notice-info row-between tabular',
         style: { padding: '7px 12px', fontSize: '12px' }
       },
         el('strong', {}, '早自习 · 08:00 – 08:15'),
-        el('span', { className: 'muted' }, '周一至周五第 1 节前（不占用正课节次）')
+        el('span', { className: 'muted' }, `第 1 节有课（${dayLabels}）`)
       )
     );
   }
@@ -1403,7 +1407,8 @@ function renderWeekView() {
         'div',
         { className: `period-tick ${sectionBreaks.has(p.index) ? 'section-break' : ''}` },
         el('span', { className: 'period-tick-num' }, String(p.index)),
-        el('span', { className: 'period-tick-time' }, p.start)
+        el('span', { className: 'period-tick-time' }, p.start),
+        el('span', { className: 'period-tick-time period-tick-end' }, p.end)
       )
     );
   }
@@ -2365,8 +2370,8 @@ function renderSettingsView() {
       )
     ),
     el('div', { className: 'notice-box notice-info row-between tabular', style: { padding: '8px 12px', fontSize: '12.5px' } },
-      el('strong', {}, '早自习（第 1 节前）'),
-      el('span', { className: 'muted' }, '08:00 – 08:15（不占用 1–13 节正课编号）')
+      el('strong', {}, '早自习（第 1 节有课时）'),
+      el('span', { className: 'muted' }, '08:00 – 08:15（不占用正课编号）')
     ),
     periodListEl,
     el('div', { className: 'row-between' },
@@ -2518,7 +2523,7 @@ function renderSettingsView() {
     el('div', { className: 'stack', style: { gap: '8px', fontSize: '13px', lineHeight: '1.6' } },
       el('div', { className: 'notice-box', style: { padding: '10px 12px' } },
         el('strong', { style: { display: 'block', marginBottom: '4px' } }, '致谢'),
-        el('span', { className: 'muted' }, '内容待定（感谢每一位使用与支持「简课表查看」的朋友，后续将在此完善致谢内容）。')
+        el('span', { className: 'muted' }, '感谢 Antigravity、GPT 与 DeepSeek 在本项目构思、开发与优化过程中提供的协助，也感谢每一位使用与支持「简课表查看」的同学与朋友。')
       ),
       el('div', { className: 'notice-box stack', style: { padding: '10px 12px', gap: '6px' } },
         el('div', { className: 'row-between' },
